@@ -206,6 +206,7 @@ pub fn tagged_leaf(pubkey: &PublicKey, protocol: &str) -> Result<H256> {
             .push_opcode(Opcode::OP_0)
             .push_opcode(Opcode::OP_IF)
             .push_bytes(&protocol.as_bytes().to_vec())
+            .push_opcode(Opcode::OP_ENDIF)
             .into_script()
     };
     stream.append(&version);
