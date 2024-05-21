@@ -46,11 +46,18 @@ pub struct Mast {
     pub m: u32,
     /// Number of people in a group
     pub g: u32,
+    /// Protocol name
+    pub protocol: String,
 }
 
 impl Mast {
     /// Create a mast instance
-    pub fn new(mut person_pubkeys: Vec<PublicKey>, threshold: u32, group: u32) -> Result<Self> {
+    pub fn new(
+        mut person_pubkeys: Vec<PublicKey>,
+        threshold: u32,
+        group: u32,
+        protocol: String,
+    ) -> Result<Self> {
         person_pubkeys.sort_unstable();
         let inner_pubkey = KeyAgg::key_aggregation_n(&person_pubkeys)?.x_tilde;
         let (pubkeys, indexs): (Vec<PublicKey>, Vec<Vec<u32>>) =
@@ -70,6 +77,7 @@ impl Mast {
             n,
             m,
             g,
+            protocol,
         })
     }
 
@@ -93,7 +101,7 @@ impl Mast {
         let leaf_nodes = self
             .pubkeys
             .iter()
-            .map(tagged_leaf)
+            .map(|p| tagged_leaf(p, &self.protocol))
             .collect::<Result<Vec<_>>>()?;
         let mut matches = vec![true];
 
@@ -126,7 +134,7 @@ impl Mast {
         let leaf_nodes = self
             .pubkeys
             .iter()
-            .map(tagged_leaf)
+            .map(|p| tagged_leaf(p, &self.protocol))
             .collect::<Result<Vec<_>>>()?;
         let filter_proof = leaf_nodes[index];
         let pmt = PartialMerkleTree::from_leaf_nodes(&leaf_nodes, &matches)?;
@@ -182,15 +190,24 @@ pub fn generate_btc_address(pubkey: &PublicKey, network: &str) -> Result<String>
 /// Calculate the leaf nodes from the pubkey
 ///
 /// tagged_hash("TapLeaf", bytes([leaf_version]) + ser_size(pubkey))
-pub fn tagged_leaf(pubkey: &PublicKey) -> Result<H256> {
+pub fn tagged_leaf(pubkey: &PublicKey, protocol: &str) -> Result<H256> {
     let mut stream = Stream::default();
 
     let version = DEFAULT_TAPSCRIPT_VER & 0xfe;
-
-    let script = Builder::default()
-        .push_bytes(&pubkey.x_coor().to_vec())
-        .push_opcode(Opcode::OP_CHECKSIG)
-        .into_script();
+    let script = if protocol.is_empty() {
+        Builder::default()
+            .push_bytes(&pubkey.x_coor().to_vec())
+            .push_opcode(Opcode::OP_CHECKSIG)
+            .into_script()
+    } else {
+        Builder::default()
+            .push_bytes(&pubkey.x_coor().to_vec())
+            .push_opcode(Opcode::OP_CHECKSIG)
+            .push_opcode(Opcode::OP_0)
+            .push_opcode(Opcode::OP_IF)
+            .push_bytes(&protocol.as_bytes().to_vec())
+            .into_script()
+    };
     stream.append(&version);
     stream.append_list(&script);
     let out = stream.out();
