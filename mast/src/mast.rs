@@ -46,11 +46,18 @@ pub struct Mast {
     pub m: u32,
     /// Number of people in a group
     pub g: u32,
+    /// Protocol name
+    pub protocol: String,
 }
 
 impl Mast {
     /// Create a mast instance
-    pub fn new(mut person_pubkeys: Vec<PublicKey>, threshold: u32, group: u32) -> Result<Self> {
+    pub fn new(
+        mut person_pubkeys: Vec<PublicKey>,
+        threshold: u32,
+        group: u32,
+        protocol: String,
+    ) -> Result<Self> {
         person_pubkeys.sort_unstable();
         let inner_pubkey = KeyAgg::key_aggregation_n(&person_pubkeys)?.x_tilde;
         let (pubkeys, indexs): (Vec<PublicKey>, Vec<Vec<u32>>) =
@@ -70,6 +77,7 @@ impl Mast {
             n,
             m,
             g,
+            protocol,
         })
     }
 
@@ -93,7 +101,7 @@ impl Mast {
         let leaf_nodes = self
             .pubkeys
             .iter()
-            .map(tagged_leaf)
+            .map(|p| tagged_leaf(p, &self.protocol))
             .collect::<Result<Vec<_>>>()?;
         let mut matches = vec![true];
 
@@ -126,7 +134,7 @@ impl Mast {
         let leaf_nodes = self
             .pubkeys
             .iter()
-            .map(tagged_leaf)
+            .map(|p| tagged_leaf(p, &self.protocol))
             .collect::<Result<Vec<_>>>()?;
         let filter_proof = leaf_nodes[index];
         let pmt = PartialMerkleTree::from_leaf_nodes(&leaf_nodes, &matches)?;
@@ -182,15 +190,25 @@ pub fn generate_btc_address(pubkey: &PublicKey, network: &str) -> Result<String>
 /// Calculate the leaf nodes from the pubkey
 ///
 /// tagged_hash("TapLeaf", bytes([leaf_version]) + ser_size(pubkey))
-pub fn tagged_leaf(pubkey: &PublicKey) -> Result<H256> {
+pub fn tagged_leaf(pubkey: &PublicKey, protocol: &str) -> Result<H256> {
     let mut stream = Stream::default();
 
     let version = DEFAULT_TAPSCRIPT_VER & 0xfe;
-
-    let script = Builder::default()
-        .push_bytes(&pubkey.x_coor().to_vec())
-        .push_opcode(Opcode::OP_CHECKSIG)
-        .into_script();
+    let script = if protocol.is_empty() {
+        Builder::default()
+            .push_bytes(&pubkey.x_coor().to_vec())
+            .push_opcode(Opcode::OP_CHECKSIG)
+            .into_script()
+    } else {
+        Builder::default()
+            .push_bytes(&pubkey.x_coor().to_vec())
+            .push_opcode(Opcode::OP_CHECKSIG)
+            .push_opcode(Opcode::OP_0)
+            .push_opcode(Opcode::OP_IF)
+            .push_bytes(&protocol.as_bytes().to_vec())
+            .push_opcode(Opcode::OP_ENDIF)
+            .into_script()
+    };
     stream.append(&version);
     stream.append_list(&script);
     let out = stream.out();
@@ -450,7 +468,7 @@ mod tests {
         let pubkey_b = convert_hex_to_pubkey("04dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba6592ce19b946c4ee58546f5251d441a065ea50735606985e5b228788bec4e582898");
         let pubkey_c = convert_hex_to_pubkey("04dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8f594bb5f72b37faae396a4259ea64ed5e6fdeb2a51c6467582b275925fab1394");
         let person_pubkeys = vec![pubkey_a, pubkey_b, pubkey_c];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
 
         assert_eq!(
             mast.agg_pubkeys_to_personal()
@@ -482,7 +500,7 @@ mod tests {
         let pubkey_b = convert_hex_to_pubkey("04dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba6592ce19b946c4ee58546f5251d441a065ea50735606985e5b228788bec4e582898");
         let pubkey_c = convert_hex_to_pubkey("04dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8f594bb5f72b37faae396a4259ea64ed5e6fdeb2a51c6467582b275925fab1394");
         let person_pubkeys = vec![pubkey_a, pubkey_b, pubkey_c];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
         let root = mast.calc_root().unwrap();
 
         assert_eq!(
@@ -523,7 +541,7 @@ mod tests {
 
         // 3/2/1
         let person_pubkeys = vec![pubkey_a.clone(), pubkey_b.clone(), pubkey_c.clone()];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
         let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
 
         let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
@@ -541,7 +559,7 @@ mod tests {
             pubkey_d.clone(),
             pubkey_e.clone(),
         ];
-        let mast = Mast::new(person_pubkeys, 3, 2).unwrap();
+        let mast = Mast::new(person_pubkeys, 3, 2, "".to_owned()).unwrap();
 
         let pubkey_abef =
             KeyAgg::key_aggregation_n(&[pubkey_b.clone(), pubkey_c.clone(), pubkey_a.clone()])
@@ -573,7 +591,7 @@ mod tests {
             pubkey_e.clone(),
             pubkey_f.clone(),
         ];
-        let mast = Mast::new(person_pubkeys, 4, 2).unwrap();
+        let mast = Mast::new(person_pubkeys, 4, 2, "".to_owned()).unwrap();
 
         let pubkey_abef = KeyAgg::key_aggregation_n(&[
             pubkey_a.clone(),
@@ -613,7 +631,7 @@ mod tests {
             "02c9929543dfa1e0bb84891acd47bfa6546b05e26b7a04af8eb6765fcc969d565f",
         );
         let person_pubkeys = vec![pubkey_alice, pubkey_bob, pubkey_charlie];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
