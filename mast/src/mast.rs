@@ -468,7 +468,7 @@ mod tests {
         let pubkey_b = convert_hex_to_pubkey("04dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba6592ce19b946c4ee58546f5251d441a065ea50735606985e5b228788bec4e582898");
         let pubkey_c = convert_hex_to_pubkey("04dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8f594bb5f72b37faae396a4259ea64ed5e6fdeb2a51c6467582b275925fab1394");
         let person_pubkeys = vec![pubkey_a, pubkey_b, pubkey_c];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
 
         assert_eq!(
             mast.agg_pubkeys_to_personal()
@@ -500,7 +500,7 @@ mod tests {
         let pubkey_b = convert_hex_to_pubkey("04dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba6592ce19b946c4ee58546f5251d441a065ea50735606985e5b228788bec4e582898");
         let pubkey_c = convert_hex_to_pubkey("04dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8f594bb5f72b37faae396a4259ea64ed5e6fdeb2a51c6467582b275925fab1394");
         let person_pubkeys = vec![pubkey_a, pubkey_b, pubkey_c];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
         let root = mast.calc_root().unwrap();
 
         assert_eq!(
@@ -541,7 +541,7 @@ mod tests {
 
         // 3/2/1
         let person_pubkeys = vec![pubkey_a.clone(), pubkey_b.clone(), pubkey_c.clone()];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
         let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
 
         let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
@@ -559,7 +559,7 @@ mod tests {
             pubkey_d.clone(),
             pubkey_e.clone(),
         ];
-        let mast = Mast::new(person_pubkeys, 3, 2).unwrap();
+        let mast = Mast::new(person_pubkeys, 3, 2, "".to_owned()).unwrap();
 
         let pubkey_abef =
             KeyAgg::key_aggregation_n(&[pubkey_b.clone(), pubkey_c.clone(), pubkey_a.clone()])
@@ -591,7 +591,7 @@ mod tests {
             pubkey_e.clone(),
             pubkey_f.clone(),
         ];
-        let mast = Mast::new(person_pubkeys, 4, 2).unwrap();
+        let mast = Mast::new(person_pubkeys, 4, 2, "".to_owned()).unwrap();
 
         let pubkey_abef = KeyAgg::key_aggregation_n(&[
             pubkey_a.clone(),
@@ -631,7 +631,7 @@ mod tests {
             "02c9929543dfa1e0bb84891acd47bfa6546b05e26b7a04af8eb6765fcc969d565f",
         );
         let person_pubkeys = vec![pubkey_alice, pubkey_bob, pubkey_charlie];
-        let mast = Mast::new(person_pubkeys, 2, 1).unwrap();
+        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned()).unwrap();
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
