@@ -67,7 +67,14 @@ impl Mast {
         locked_timestamp: Option<u32>,
     ) -> Result<Self> {
         person_pubkeys.sort_unstable();
-        let inner_pubkey = KeyAgg::key_aggregation_n(&person_pubkeys)?.x_tilde;
+        let inner_pubkey = if self_host_pubkey.is_some() && locked_timestamp.is_some() {
+            let mut all_pubkeys = person_pubkeys.clone(); // 克隆原始向量
+            all_pubkeys.push(self_host_pubkey.clone().expect("Pubkey exist"));
+            all_pubkeys.sort_unstable();
+            KeyAgg::key_aggregation_n(&all_pubkeys)?.x_tilde
+        } else {
+            KeyAgg::key_aggregation_n(&person_pubkeys)?.x_tilde
+        };
         let (pubkeys, indexs): (Vec<PublicKey>, Vec<Vec<u32>>) =
             generate_combine_pubkey(person_pubkeys.clone(), threshold, group)?
                 .into_iter()
@@ -670,7 +677,7 @@ mod tests {
 
         assert_eq!(
             hex::encode(&proof),
-            "c1f4152c91b2c78a3524e7858c72ffa360da59e7c3c4d67d6787cf1e3bfe1684c19a3e32f5d108199755200e50fd1bfb10aafc51dbac354d6c51c164e32aecc7172e8e792ef3ab4a4746c4655509163958fca2f70fe07679a3cb4f797e7b4fd3ba",
+            "c09d386c959ef2e523b910df47604b069a38315184bc98f216fe9a4a988a5c51039a3e32f5d108199755200e50fd1bfb10aafc51dbac354d6c51c164e32aecc7172e8e792ef3ab4a4746c4655509163958fca2f70fe07679a3cb4f797e7b4fd3ba",
         );
 
         // 5/3/2
@@ -775,7 +782,7 @@ mod tests {
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
-            "bc1p6f2tvagq2cuvjwevd564de6rh9e6qdvpwqrupde4jw62xul3p92s66flqy",
+            "bc1p6qkpupkdlytg8t89rhr4ux5vpgmj073qgu6uyqm03yj6fhcwre7s5z4fmg",
             addr
         );
     }
