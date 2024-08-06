@@ -164,7 +164,7 @@ impl Mast {
                 .collect::<Vec<_>>()
                 .concat(),
         ]
-            .concat())
+        .concat())
     }
 
     fn generate_leaf_nodes(&self) -> Result<Vec<H256>> {
@@ -222,7 +222,7 @@ pub fn generate_btc_address(pubkey: &PublicKey, network: &str) -> Result<String>
         pubkey.x_coor().to_vec(),
         network,
     )
-        .map_err(|_| MastError::EncodeToBech32Error)?;
+    .map_err(|_| MastError::EncodeToBech32Error)?;
     Ok(witness.to_string())
 }
 
@@ -583,12 +583,30 @@ mod tests {
         let pubkey_a = convert_hex_to_pubkey("04f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672");
         let pubkey_b = convert_hex_to_pubkey("04dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba6592ce19b946c4ee58546f5251d441a065ea50735606985e5b228788bec4e582898");
         let pubkey_c = convert_hex_to_pubkey("04dd308afec5777e13121fa72b9cc1b7cc0139715309b086c960e18fd969774eb8f594bb5f72b37faae396a4259ea64ed5e6fdeb2a51c6467582b275925fab1394");
-        let person_pubkeys = vec![pubkey_a, pubkey_b, pubkey_c];
-        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned(), None, None).unwrap();
+        let person_pubkeys = vec![pubkey_a.clone(), pubkey_b, pubkey_c];
+        let mast = Mast::new(person_pubkeys.clone(), 2, 1, "".to_owned(), None, None).unwrap();
         let root = mast.calc_root().unwrap();
 
         assert_eq!(
             "69e1de34d13d69fd894d708d656d0557cacaa18a093a6e86327a991d95c6c8e1",
+            root.to_hex()
+        );
+
+        let self_host_pubkey = pubkey_a;
+        let locked_timestamp = 1722926340;
+        let mast = Mast::new(
+            person_pubkeys,
+            2,
+            1,
+            "".to_owned(),
+            Some(self_host_pubkey),
+            Some(locked_timestamp),
+        )
+        .unwrap();
+        let root = mast.calc_root().unwrap();
+
+        assert_eq!(
+            "1952ab0f4b31de297eb78a59120f42636217daba9d2eb5f58341b865583033b1",
             root.to_hex()
         );
     }
@@ -625,7 +643,7 @@ mod tests {
 
         // 3/2/1
         let person_pubkeys = vec![pubkey_a.clone(), pubkey_b.clone(), pubkey_c.clone()];
-        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned(), None, None).unwrap();
+        let mast = Mast::new(person_pubkeys.clone(), 2, 1, "".to_owned(), None, None).unwrap();
         let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
 
         let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
@@ -633,6 +651,26 @@ mod tests {
         assert_eq!(
             hex::encode(&proof),
             "c0f4152c91b2c78a3524e7858c72ffa360da59e7c3c4d67d6787cf1e3bfe1684c1e38e30c81fc61186d0ed3956b5e49bd175178a638d1410e64f7716697a7e0ccd",
+        );
+
+        let self_host_pubkey = pubkey_a.clone();
+        let locked_timestamp = 1722926340;
+        let mast = Mast::new(
+            person_pubkeys,
+            2,
+            1,
+            "".to_owned(),
+            Some(self_host_pubkey),
+            Some(locked_timestamp),
+        )
+        .unwrap();
+        let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
+
+        let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
+
+        assert_eq!(
+            hex::encode(&proof),
+            "c1f4152c91b2c78a3524e7858c72ffa360da59e7c3c4d67d6787cf1e3bfe1684c19a3e32f5d108199755200e50fd1bfb10aafc51dbac354d6c51c164e32aecc7172e8e792ef3ab4a4746c4655509163958fca2f70fe07679a3cb4f797e7b4fd3ba",
         );
 
         // 5/3/2
@@ -661,8 +699,8 @@ mod tests {
             pubkey_c.clone(),
             pubkey_f.clone(),
         ])
-            .unwrap()
-            .x_tilde;
+        .unwrap()
+        .x_tilde;
         let proof = mast.generate_merkle_proof(&pubkey_abcf);
         assert_eq!(proof, Err(MastError::MastGenProofError),);
 
@@ -683,8 +721,8 @@ mod tests {
             pubkey_e.clone(),
             pubkey_f.clone(),
         ])
-            .unwrap()
-            .x_tilde;
+        .unwrap()
+        .x_tilde;
         let proof = mast.generate_merkle_proof(&pubkey_abef).unwrap();
         assert_eq!(
             hex::encode(&proof),
@@ -697,8 +735,8 @@ mod tests {
             pubkey_c.clone(),
             pubkey_f.clone(),
         ])
-            .unwrap()
-            .x_tilde;
+        .unwrap()
+        .x_tilde;
         let proof = mast.generate_merkle_proof(&pubkey_abcf);
         assert_eq!(proof, Err(MastError::MastGenProofError),);
     }
@@ -714,12 +752,30 @@ mod tests {
         let pubkey_charlie = convert_hex_to_pubkey(
             "02c9929543dfa1e0bb84891acd47bfa6546b05e26b7a04af8eb6765fcc969d565f",
         );
-        let person_pubkeys = vec![pubkey_alice, pubkey_bob, pubkey_charlie];
-        let mast = Mast::new(person_pubkeys, 2, 1, "".to_owned(), None, None).unwrap();
+        let person_pubkeys = vec![pubkey_alice.clone(), pubkey_bob, pubkey_charlie];
+        let mast = Mast::new(person_pubkeys.clone(), 2, 1, "".to_owned(), None, None).unwrap();
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
             "bc1pn202yeugfa25nssxk2hv902kmxrnp7g9xt487u256n20jgahuwas6syxhp",
+            addr
+        );
+
+        let self_host_pubkey = pubkey_alice;
+        let locked_timestamp = 1722926340;
+        let mast = Mast::new(
+            person_pubkeys,
+            2,
+            1,
+            "".to_owned(),
+            Some(self_host_pubkey),
+            Some(locked_timestamp),
+        )
+        .unwrap();
+
+        let addr = mast.generate_address("Mainnet").unwrap();
+        assert_eq!(
+            "bc1p6f2tvagq2cuvjwevd564de6rh9e6qdvpwqrupde4jw62xul3p92s66flqy",
             addr
         );
     }
