@@ -465,7 +465,7 @@ impl Script {
                 Opcode::OP_CHECKSIG | Opcode::OP_CHECKSIGVERIFY => {
                     total += 1;
                 }
-                Opcode::OP_CHECKDATASIG | Opcode::OP_CHECKDATASIGVERIFY if checkdatasig_active => {
+                Opcode::OP_CHECKSIGADD | Opcode::OP_CHECKDATASIGVERIFY if checkdatasig_active => {
                     total += 1;
                 }
                 Opcode::OP_CHECKMULTISIG | Opcode::OP_CHECKMULTISIGVERIFY => {
@@ -1039,7 +1039,7 @@ OP_ADD
         assert_eq!(script.script_type(), ScriptType::WitnessV0Keyhash);
         assert_eq!(
             script.extract_destinations(),
-            Ok(vec![ScriptAddress::new_p2wpkh(address),])
+            Ok(vec![ScriptAddress::new_p2wpkh(address)])
         );
     }
 
@@ -1058,7 +1058,7 @@ OP_ADD
         assert_eq!(script.script_type(), ScriptType::WitnessV0Scripthash);
         assert_eq!(
             script.extract_destinations(),
-            Ok(vec![ScriptAddress::new_p2wsh(address),])
+            Ok(vec![ScriptAddress::new_p2wsh(address)])
         );
     }
 
@@ -1077,7 +1077,7 @@ OP_ADD
         assert_eq!(script.script_type(), ScriptType::WitnessV1Taproot);
         assert_eq!(
             script.extract_destinations(),
-            Ok(vec![ScriptAddress::new_p2tr(address),])
+            Ok(vec![ScriptAddress::new_p2tr(address)])
         );
     }
 
@@ -1107,7 +1107,7 @@ OP_ADD
     #[test]
     fn test_num_signatures_with_checkdatasig() {
         let script = Builder::default()
-            .push_opcode(Opcode::OP_CHECKDATASIG)
+            .push_opcode(Opcode::OP_CHECKSIGADD)
             .into_script();
         assert_eq!(script.sigops_count(false, false), 0);
         assert_eq!(script.sigops_count(true, false), 1);

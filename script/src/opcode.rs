@@ -227,8 +227,10 @@ pub enum Opcode {
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 
+    // Opcode added by BIP 342 (Tapscript)
+    OP_CHECKSIGADD = 0xba,
+    // OP_CHECKDATASIG = 0xba
     // BCH crypto
-    OP_CHECKDATASIG = 0xba,
     OP_CHECKDATASIGVERIFY = 0xbb,
 }
 
@@ -449,7 +451,7 @@ impl Opcode {
             0xb9 => Some(OP_NOP10),
 
             // BCH crypto
-            0xba => Some(OP_CHECKDATASIG),
+            0xba => Some(OP_CHECKSIGADD),
             0xbb => Some(OP_CHECKDATASIGVERIFY),
 
             _ => None,
@@ -1212,8 +1214,8 @@ mod tests {
 
         // BCH crypto
         assert_eq!(
-            Opcode::OP_CHECKDATASIG,
-            Opcode::from_u8(Opcode::OP_CHECKDATASIG as u8).unwrap()
+            Opcode::OP_CHECKSIGADD,
+            Opcode::from_u8(Opcode::OP_CHECKSIGADD as u8).unwrap()
         );
         assert_eq!(
             Opcode::OP_CHECKDATASIGVERIFY,

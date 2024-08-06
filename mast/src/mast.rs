@@ -4,7 +4,7 @@
 use bitcoin_bech32::{constants::Network, u5, WitnessProgram};
 use codec::{Decode, Encode};
 use core::cmp::min;
-use light_bitcoin_script::{Builder, Opcode, H256};
+use light_bitcoin_script::{Builder, Num, Opcode, H256};
 use light_bitcoin_serialization::Stream;
 
 use super::{
@@ -24,6 +24,8 @@ use digest::Digest;
 use hashes::hex::ToHex;
 use light_bitcoin_keys::{HashAdd, Tagged};
 
+use crate::error::MastError::InvalidSelfHostInfo;
+use light_bitcoin_script::Opcode::OP_DROP;
 #[cfg(feature = "std")]
 use rayon::prelude::*;
 
@@ -48,6 +50,10 @@ pub struct Mast {
     pub g: u32,
     /// Protocol name
     pub protocol: String,
+    /// Self-host pubkey [Optional]
+    pub self_host_pubkey: Option<PublicKey>,
+    /// Self-host time locker [Optional]
+    pub locked_timestamp: Option<u32>,
 }
 
 impl Mast {
@@ -57,6 +63,8 @@ impl Mast {
         threshold: u32,
         group: u32,
         protocol: String,
+        self_host_pubkey: Option<PublicKey>,
+        locked_timestamp: Option<u32>,
     ) -> Result<Self> {
         person_pubkeys.sort_unstable();
         let inner_pubkey = KeyAgg::key_aggregation_n(&person_pubkeys)?.x_tilde;
@@ -78,6 +86,8 @@ impl Mast {
             m,
             g,
             protocol,
+            self_host_pubkey,
+            locked_timestamp,
         })
     }
 
@@ -98,12 +108,9 @@ impl Mast {
 
     /// calculate merkle root
     pub fn calc_root(&self) -> Result<H256> {
-        let leaf_nodes = self
-            .pubkeys
-            .iter()
-            .map(|p| tagged_leaf(p, &self.protocol))
-            .collect::<Result<Vec<_>>>()?;
-        let mut matches = vec![true];
+        let leaf_nodes = self.generate_leaf_nodes()?;
+
+        let mut matches = vec![false, true];
 
         // if self.pubkeys.len() < 2 {
         //     return Err(MastError::MastBuildError);
@@ -121,21 +128,22 @@ impl Mast {
             return Err(MastError::MastGenProofError);
         }
 
-        let mut matches = vec![];
+        let mut matches = if self.self_host_pubkey.is_some() && self.locked_timestamp.is_some() {
+            vec![false]
+        } else {
+            vec![]
+        };
         let mut index = 9999;
-        for (i, s) in self.pubkeys.iter().enumerate() {
-            if *s == *pubkey {
+        for s in &self.pubkeys {
+            if s == pubkey {
                 matches.push(true);
-                index = i;
+                index = matches.len() - 1;
             } else {
                 matches.push(false)
             }
         }
-        let leaf_nodes = self
-            .pubkeys
-            .iter()
-            .map(|p| tagged_leaf(p, &self.protocol))
-            .collect::<Result<Vec<_>>>()?;
+
+        let leaf_nodes = self.generate_leaf_nodes()?;
         let filter_proof = leaf_nodes[index];
         let pmt = PartialMerkleTree::from_leaf_nodes(&leaf_nodes, &matches)?;
         let mut matches_vec: Vec<H256> = vec![];
@@ -153,6 +161,33 @@ impl Mast {
                 .concat(),
         ]
         .concat())
+    }
+
+    fn generate_leaf_nodes(&self) -> Result<Vec<H256>> {
+        if self.self_host_pubkey.is_some() && self.locked_timestamp.is_some() {
+            let self_host_pubkey = self.self_host_pubkey.clone().ok_or(InvalidSelfHostInfo)?;
+            let locked_timestamp = self.locked_timestamp.ok_or(InvalidSelfHostInfo)?;
+            let mut time_lock_node =
+                vec![timelock_tagged_leaf(&self_host_pubkey, locked_timestamp)?];
+            let mut leaf_nodes = self
+                .pubkeys
+                .iter()
+                .map(|p| {
+                    let self_host_pubkey =
+                        self.self_host_pubkey.clone().ok_or(InvalidSelfHostInfo)?;
+                    self_host_tagged_leaf(p, &self_host_pubkey)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            time_lock_node.append(&mut leaf_nodes);
+            Ok(time_lock_node)
+        } else {
+            let leaf_nodes = self
+                .pubkeys
+                .iter()
+                .map(|p| tagged_leaf(p, &self.protocol))
+                .collect::<Result<Vec<_>>>()?;
+            Ok(leaf_nodes)
+        }
     }
 
     /// generate threshold signature tweak pubkey
@@ -185,6 +220,51 @@ pub fn generate_btc_address(pubkey: &PublicKey, network: &str) -> Result<String>
     )
     .map_err(|_| MastError::EncodeToBech32Error)?;
     Ok(witness.to_string())
+}
+
+pub fn timelock_tagged_leaf(self_host_pubkey: &PublicKey, locked_timestamp: u32) -> Result<H256> {
+    let mut stream = Stream::default();
+
+    let version = DEFAULT_TAPSCRIPT_VER & 0xfe;
+    let script = Builder::default()
+        .push_num(Num::from(locked_timestamp))
+        .push_opcode(Opcode::OP_CHECKLOCKTIMEVERIFY)
+        .push_opcode(OP_DROP)
+        .push_bytes(&self_host_pubkey.x_coor().to_vec())
+        .push_opcode(Opcode::OP_CHECKSIG)
+        .into_script();
+    stream.append(&version);
+    stream.append_list(&script);
+    let out = stream.out();
+
+    let hash = sha2::Sha256::default()
+        .tagged(b"TapLeaf")
+        .add(&out[..])
+        .finalize();
+    Ok(H256::from_slice(&hash.to_vec()))
+}
+
+pub fn self_host_tagged_leaf(agg_pubkey: &PublicKey, self_host_pubkey: &PublicKey) -> Result<H256> {
+    let mut stream = Stream::default();
+
+    let version = DEFAULT_TAPSCRIPT_VER & 0xfe;
+    let script = Builder::default()
+        .push_bytes(&self_host_pubkey.x_coor().to_vec())
+        .push_opcode(Opcode::OP_CHECKSIG)
+        .push_bytes(&agg_pubkey.x_coor().to_vec())
+        .push_opcode(Opcode::OP_CHECKSIGADD)
+        .push_num(Num::from(2))
+        .push_opcode(Opcode::OP_NUMEQUAL)
+        .into_script();
+    stream.append(&version);
+    stream.append_list(&script);
+    let out = stream.out();
+
+    let hash = sha2::Sha256::default()
+        .tagged(b"TapLeaf")
+        .add(&out[..])
+        .finalize();
+    Ok(H256::from_slice(&hash.to_vec()))
 }
 
 /// Calculate the leaf nodes from the pubkey
