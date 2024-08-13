@@ -264,7 +264,7 @@ pub fn self_host_tagged_leaf(agg_pubkey: &PublicKey, self_host_pubkey: &PublicKe
         .push_opcode(Opcode::OP_CHECKSIG)
         .push_bytes(&agg_pubkey.x_coor().to_vec())
         .push_opcode(Opcode::OP_CHECKSIGADD)
-        .push_num(Num::from(2))
+        .push_opcode(Opcode::OP_2)
         .push_opcode(Opcode::OP_NUMEQUAL)
         .into_script();
     stream.append(&version);
@@ -613,7 +613,7 @@ mod tests {
         let root = mast.calc_root().unwrap();
 
         assert_eq!(
-            "1952ab0f4b31de297eb78a59120f42636217daba9d2eb5f58341b865583033b1",
+            "0ab313ba9e19f041adbb6ebd9644423c0b42249459ba7861b4098e01e7513498",
             root.to_hex()
         );
     }
@@ -677,7 +677,7 @@ mod tests {
 
         assert_eq!(
             hex::encode(&proof),
-            "c09d386c959ef2e523b910df47604b069a38315184bc98f216fe9a4a988a5c51039a3e32f5d108199755200e50fd1bfb10aafc51dbac354d6c51c164e32aecc7172e8e792ef3ab4a4746c4655509163958fca2f70fe07679a3cb4f797e7b4fd3ba",
+            "c09d386c959ef2e523b910df47604b069a38315184bc98f216fe9a4a988a5c5103c4b08142adb483a67cd74e75ce94feefaa4a93b103cf097d9d0ccdbc612d84e0a36b60ca53bd2dbcbb99a84538fd7238de016a8d274cfd4868252664cfc18bcc",
         );
 
         // 5/3/2
@@ -782,7 +782,7 @@ mod tests {
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
-            "bc1p6qkpupkdlytg8t89rhr4ux5vpgmj073qgu6uyqm03yj6fhcwre7s5z4fmg",
+            "bc1pq9htus76355e3eu7amgz7ygjy5ya883axthdgaxhkx0u4w3qp4hq952g0g",
             addr
         );
     }
