@@ -39,6 +39,8 @@ pub enum MastError {
     InvalidThreshold,
     // Invalid self-host info
     InvalidSelfHostInfo,
+    // Invalid opcode
+    InvalidOpcode,
 }
 
 impl From<io::Error> for MastError {
