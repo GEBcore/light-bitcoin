@@ -173,7 +173,7 @@ impl Mast {
                 .collect::<Vec<_>>()
                 .concat(),
         ]
-            .concat())
+        .concat())
     }
 
     fn generate_leaf_nodes(&self) -> Result<Vec<H256>> {
@@ -181,14 +181,15 @@ impl Mast {
             let self_host_pubkeys = &info.self_host_pubkeys;
             let self_host_threshold = info.threshold;
             let locked_timestamp = info.locked_timestamp;
-            let mut time_lock_node =
-                vec![timelock_tagged_leaf(self_host_pubkeys, self_host_threshold, locked_timestamp)?];
+            let mut time_lock_node = vec![timelock_tagged_leaf(
+                self_host_pubkeys,
+                self_host_threshold,
+                locked_timestamp,
+            )?];
             let mut leaf_nodes = self
                 .pubkeys
                 .iter()
-                .map(|p| {
-                    self_host_tagged_leaf(p, self_host_pubkeys, self_host_threshold)
-                })
+                .map(|p| self_host_tagged_leaf(p, self_host_pubkeys, self_host_threshold))
                 .collect::<Result<Vec<_>>>()?;
             time_lock_node.append(&mut leaf_nodes);
             Ok(time_lock_node)
@@ -230,11 +231,15 @@ pub fn generate_btc_address(pubkey: &PublicKey, network: &str) -> Result<String>
         pubkey.x_coor().to_vec(),
         network,
     )
-        .map_err(|_| MastError::EncodeToBech32Error)?;
+    .map_err(|_| MastError::EncodeToBech32Error)?;
     Ok(witness.to_string())
 }
 
-pub fn timelock_tagged_leaf(self_host_pubkeys: &[PublicKey], self_host_threshold: u32, locked_timestamp: u32) -> Result<H256> {
+pub fn timelock_tagged_leaf(
+    self_host_pubkeys: &[PublicKey],
+    self_host_threshold: u32,
+    locked_timestamp: u32,
+) -> Result<H256> {
     let holder_num = self_host_pubkeys.len() as u32;
 
     if holder_num < self_host_threshold || self_host_threshold == 0 {
@@ -255,9 +260,12 @@ pub fn timelock_tagged_leaf(self_host_pubkeys: &[PublicKey], self_host_threshold
 
     if holder_num > 1 {
         for pubkey in &self_host_pubkeys[1..] {
-            builder = builder.push_bytes(&pubkey.x_coor().to_vec()).push_opcode(Opcode::OP_CHECKSIGADD);
+            builder = builder
+                .push_bytes(&pubkey.x_coor().to_vec())
+                .push_opcode(Opcode::OP_CHECKSIGADD);
         }
-        let op_num = Opcode::from_u8(0x50 + self_host_threshold as u8).ok_or(MastError::InvalidOpcode)?;
+        let op_num =
+            Opcode::from_u8(0x50 + self_host_threshold as u8).ok_or(MastError::InvalidOpcode)?;
         builder = builder.push_opcode(op_num).push_opcode(Opcode::OP_NUMEQUAL);
     }
 
@@ -274,7 +282,11 @@ pub fn timelock_tagged_leaf(self_host_pubkeys: &[PublicKey], self_host_threshold
     Ok(H256::from_slice(&hash.to_vec()))
 }
 
-pub fn self_host_tagged_leaf(agg_pubkey: &PublicKey, self_host_pubkeys: &[PublicKey], self_host_threshold: u32) -> Result<H256> {
+pub fn self_host_tagged_leaf(
+    agg_pubkey: &PublicKey,
+    self_host_pubkeys: &[PublicKey],
+    self_host_threshold: u32,
+) -> Result<H256> {
     let holder_num = self_host_pubkeys.len() as u32;
 
     if holder_num < self_host_threshold || self_host_threshold == 0 {
@@ -291,16 +303,25 @@ pub fn self_host_tagged_leaf(agg_pubkey: &PublicKey, self_host_pubkeys: &[Public
         .push_opcode(Opcode::OP_CHECKSIG);
 
     if holder_num == 1 {
-        builder = builder.push_bytes(&agg_pubkey.x_coor().to_vec())
+        builder = builder
+            .push_bytes(&agg_pubkey.x_coor().to_vec())
             .push_opcode(Opcode::OP_CHECKSIGADD)
             .push_opcode(Opcode::OP_2)
             .push_opcode(Opcode::OP_NUMEQUAL)
     } else {
         for pubkey in &self_host_pubkeys[1..] {
-            builder = builder.push_bytes(&pubkey.x_coor().to_vec()).push_opcode(Opcode::OP_CHECKSIGADD);
+            builder = builder
+                .push_bytes(&pubkey.x_coor().to_vec())
+                .push_opcode(Opcode::OP_CHECKSIGADD);
         }
-        let op_num = Opcode::from_u8(0x50 + self_host_threshold as u8).ok_or(MastError::InvalidOpcode)?;
-        builder = builder.push_opcode(op_num).push_opcode(Opcode::OP_NUMEQUAL).push_opcode(Opcode::OP_DROP).push_bytes(&agg_pubkey.x_coor().to_vec()).push_opcode(Opcode::OP_CHECKSIG);
+        let op_num =
+            Opcode::from_u8(0x50 + self_host_threshold as u8).ok_or(MastError::InvalidOpcode)?;
+        builder = builder
+            .push_opcode(op_num)
+            .push_opcode(Opcode::OP_NUMEQUAL)
+            .push_opcode(Opcode::OP_DROP)
+            .push_bytes(&agg_pubkey.x_coor().to_vec())
+            .push_opcode(Opcode::OP_CHECKSIG);
     }
 
     let script = builder.into_script();
@@ -649,7 +670,7 @@ mod tests {
                 locked_timestamp,
             }),
         )
-            .unwrap();
+        .unwrap();
         let root = mast.calc_root().unwrap();
 
         assert_eq!(
@@ -713,7 +734,7 @@ mod tests {
                 locked_timestamp,
             }),
         )
-            .unwrap();
+        .unwrap();
         let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
 
         let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
@@ -749,8 +770,8 @@ mod tests {
             pubkey_c.clone(),
             pubkey_f.clone(),
         ])
-            .unwrap()
-            .x_tilde;
+        .unwrap()
+        .x_tilde;
         let proof = mast.generate_merkle_proof(&pubkey_abcf);
         assert_eq!(proof, Err(MastError::MastGenProofError),);
 
@@ -771,8 +792,8 @@ mod tests {
             pubkey_e.clone(),
             pubkey_f.clone(),
         ])
-            .unwrap()
-            .x_tilde;
+        .unwrap()
+        .x_tilde;
         let proof = mast.generate_merkle_proof(&pubkey_abef).unwrap();
         assert_eq!(
             hex::encode(&proof),
@@ -785,8 +806,8 @@ mod tests {
             pubkey_c.clone(),
             pubkey_f.clone(),
         ])
-            .unwrap()
-            .x_tilde;
+        .unwrap()
+        .x_tilde;
         let proof = mast.generate_merkle_proof(&pubkey_abcf);
         assert_eq!(proof, Err(MastError::MastGenProofError),);
     }
@@ -824,7 +845,7 @@ mod tests {
                 locked_timestamp,
             }),
         )
-            .unwrap();
+        .unwrap();
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
