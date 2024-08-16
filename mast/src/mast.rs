@@ -136,7 +136,7 @@ impl Mast {
     }
 
     /// generate merkle proof
-    pub fn generate_merkle_proof(&self, pubkey: &PublicKey) -> Result<Vec<u8>> {
+    pub fn generate_merkle_proof(&self, pubkey: &PublicKey, expired: Option<bool>) -> Result<Vec<u8>> {
         if !self.pubkeys.iter().any(|s| *s == *pubkey) {
             return Err(MastError::MastGenProofError);
         }
@@ -147,14 +147,26 @@ impl Mast {
             vec![]
         };
         let mut index = 9999;
-        for s in &self.pubkeys {
-            if s == pubkey {
-                matches.push(true);
-                index = matches.len() - 1;
-            } else {
-                matches.push(false)
+
+        if let Some(expired) = expired {
+            if expired {
+                matches = vec![true];
+                for _ in &self.pubkeys {
+                    matches.push(false)
+                }
+                index = 0;
+            }
+        } else {
+            for s in &self.pubkeys {
+                if s == pubkey {
+                    matches.push(true);
+                    index = matches.len() - 1;
+                } else {
+                    matches.push(false)
+                }
             }
         }
+
 
         let leaf_nodes = self.generate_leaf_nodes()?;
         let filter_proof = leaf_nodes[index];
@@ -173,7 +185,7 @@ impl Mast {
                 .collect::<Vec<_>>()
                 .concat(),
         ]
-        .concat())
+            .concat())
     }
 
     fn generate_leaf_nodes(&self) -> Result<Vec<H256>> {
@@ -231,7 +243,7 @@ pub fn generate_btc_address(pubkey: &PublicKey, network: &str) -> Result<String>
         pubkey.x_coor().to_vec(),
         network,
     )
-    .map_err(|_| MastError::EncodeToBech32Error)?;
+        .map_err(|_| MastError::EncodeToBech32Error)?;
     Ok(witness.to_string())
 }
 
@@ -670,7 +682,7 @@ mod tests {
                 locked_timestamp,
             }),
         )
-        .unwrap();
+            .unwrap();
         let root = mast.calc_root().unwrap();
 
         assert_eq!(
@@ -714,7 +726,7 @@ mod tests {
         let mast = Mast::new(person_pubkeys.clone(), 2, 1, "".to_owned(), None).unwrap();
         let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
 
-        let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
+        let proof = mast.generate_merkle_proof(&pubkey_ab, None).unwrap();
 
         assert_eq!(
             hex::encode(&proof),
@@ -734,10 +746,10 @@ mod tests {
                 locked_timestamp,
             }),
         )
-        .unwrap();
+            .unwrap();
         let pubkey_ab = convert_hex_to_pubkey("04e7c92d2ef4294389c385fedd5387fba806687f5aba1c7ba285093dacd69354d9b4f9ea87450c75954ade455677475e92fb5e303db36753c2ea20e47d3e939662");
 
-        let proof = mast.generate_merkle_proof(&pubkey_ab).unwrap();
+        let proof = mast.generate_merkle_proof(&pubkey_ab, None).unwrap();
 
         assert_eq!(
             hex::encode(&proof),
@@ -758,7 +770,7 @@ mod tests {
             KeyAgg::key_aggregation_n(&[pubkey_b.clone(), pubkey_c.clone(), pubkey_a.clone()])
                 .unwrap()
                 .x_tilde;
-        let proof = mast.generate_merkle_proof(&pubkey_abef).unwrap();
+        let proof = mast.generate_merkle_proof(&pubkey_abef, None).unwrap();
         assert_eq!(
             hex::encode(&proof),
             "c05d173c64d514249707214af1c87206b84daeff743e97d1f85fd6c1d282c547209bec0ccfa0311447bc193675aefb0c0a8a557a2dfcdbb48676adc6aa1f0ea5ee",
@@ -770,9 +782,9 @@ mod tests {
             pubkey_c.clone(),
             pubkey_f.clone(),
         ])
-        .unwrap()
-        .x_tilde;
-        let proof = mast.generate_merkle_proof(&pubkey_abcf);
+            .unwrap()
+            .x_tilde;
+        let proof = mast.generate_merkle_proof(&pubkey_abcf, None);
         assert_eq!(proof, Err(MastError::MastGenProofError),);
 
         // 6/4/2
@@ -792,9 +804,9 @@ mod tests {
             pubkey_e.clone(),
             pubkey_f.clone(),
         ])
-        .unwrap()
-        .x_tilde;
-        let proof = mast.generate_merkle_proof(&pubkey_abef).unwrap();
+            .unwrap()
+            .x_tilde;
+        let proof = mast.generate_merkle_proof(&pubkey_abef, None).unwrap();
         assert_eq!(
             hex::encode(&proof),
             "c1b1194ddbb297bb0fc26d39bfaa9ac4bec4b458775e33d600edc068de31c565231651a7ddda9b73221f02f1f9ade1032c7660ed5ed17f24d6c395b769f2125d4003bb3059b56302e1d3ab177e560459a361f6eaf4ce31aea50f991d2652b964b2",
@@ -806,9 +818,9 @@ mod tests {
             pubkey_c.clone(),
             pubkey_f.clone(),
         ])
-        .unwrap()
-        .x_tilde;
-        let proof = mast.generate_merkle_proof(&pubkey_abcf);
+            .unwrap()
+            .x_tilde;
+        let proof = mast.generate_merkle_proof(&pubkey_abcf, None);
         assert_eq!(proof, Err(MastError::MastGenProofError),);
     }
 
@@ -845,7 +857,7 @@ mod tests {
                 locked_timestamp,
             }),
         )
-        .unwrap();
+            .unwrap();
 
         let addr = mast.generate_address("Mainnet").unwrap();
         assert_eq!(
