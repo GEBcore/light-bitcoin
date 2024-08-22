@@ -147,15 +147,14 @@ impl Mast {
             vec![]
         };
         let mut index = 9999;
-
-        if let Some(expired) = expired {
-            if expired {
-                matches = vec![true];
-                for _ in &self.pubkeys {
-                    matches.push(false)
-                }
-                index = 0;
+        
+        let expired = expired.unwrap_or_default();
+        if expired {
+            matches = vec![true];
+            for _ in &self.pubkeys {
+                matches.push(false)
             }
+            index = 0;
         } else {
             for s in &self.pubkeys {
                 if s == pubkey {
