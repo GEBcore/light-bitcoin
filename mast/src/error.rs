@@ -37,6 +37,10 @@ pub enum MastError {
     InvalidRedeemLength,
     // Invalid redeem script threshold
     InvalidThreshold,
+    // Invalid self-host info
+    InvalidSelfHostInfo,
+    // Invalid opcode
+    InvalidOpcode,
 }
 
 impl From<io::Error> for MastError {
